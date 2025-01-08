@@ -1,0 +1,44 @@
+// manifest.json
+{
+    "name": "Juego de Exploración",
+    "short_name": "Explorador",
+    "start_url": "index.html",
+    "display": "fullscreen",
+    "background_color": "#333333",
+    "theme_color": "#4B692F",
+    "orientation": "landscape",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
+
+// sw.js (Service Worker)
+const CACHE_NAME = 'juego-explorador-v1';
+const urlsToCache = [
+  'index.html',
+  'manifest.json',
+  'https://cdnjs.cloudflare.com/ajax/libs/phaser/3.55.2/phaser.min.js'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
+  );
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => response || fetch(event.request))
+  );
+});
