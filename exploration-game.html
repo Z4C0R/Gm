@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Juego de Exploración</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.55.2/phaser.min.js"></script>
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #333; }
+    </style>
+</head>
+<body>
+<script>
+class MainScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'MainScene' });
+    }
+
+    preload() {
+        // No necesitamos precargar imágenes ya que usaremos formas geométricas
+    }
+
+    create() {
+        // Configuración inicial
+        this.gameWidth = 800;
+        this.gameHeight = 600;
+        
+        // Crear borde del juego
+        this.add.rectangle(0, 0, this.gameWidth, this.gameHeight, 0x000066).setOrigin(0, 0); // Azul oscuro
+        this.add.rectangle(10, 10, this.gameWidth - 20, this.gameHeight - 20, 0x0000ff).setOrigin(0, 0); // Azul
+
+        // Crear jugador
+        this.player = this.add.rectangle(400, 300, 20, 20, 0xffffff);
+        this.physics.add.existing(this.player);
+        this.player.body.setCollideWorldBounds(true);
+
+        // Área de crafting
+        this.craftingArea = this.add.rectangle(this.gameWidth - 50, this.gameHeight - 50, 40, 40, 0x666666);
+        this.physics.add.existing(this.craftingArea, true);
+
+        // Inventario (3 slots)
+        this.inventory = [];
+        this.inventorySlots = [];
+        for (let i = 0; i < 3; i++) {
+            let slot = this.add.rectangle(300 + (i * 60), this.gameHeight - 40, 50, 50, 0x333333);
+            this.inventorySlots.push(slot);
+        }
+
+        // Grupo de objetos recolectables
+        this.collectibles = this.physics.add.group();
+        this.generateCollectibles();
+
+        // Configurar colisiones
+        this.physics.add.overlap(this.player, this.collectibles, this.collectItem, null, this);
+        this.physics.add.overlap(this.player, this.craftingArea, this.checkCrafting, null, this);
+
+        // Configurar input
+        this.input.on('pointerdown', (pointer) => {
+            this.physics.moveTo(this.player, pointer.x, pointer.y, 200);
+        });
+    }
+
+    generateCollectibles() {
+        // Generar 2-3 objetos a la vez
+        const count = Phaser.Math.Between(2, 3);
+        for (let i = 0; i < count; i++) {
+            const x = Phaser.Math.Between(50, this.gameWidth - 50);
+            const y = Phaser.Math.Between(50, this.gameHeight - 100);
+            
+            // Crear una cruz verde
+            const cross = this.add.graphics();
+            cross.lineStyle(3, 0x00ff00);
+            cross.moveTo(-10, 0);
+            cross.lineTo(10, 0);
+            cross.moveTo(0, -10);
+            cross.lineTo(0, 10);
+            
+            const sprite = this.add.rectangle(x, y, 20, 20, 0x00ff00);
+            sprite.cross = cross;
+            cross.x = x;
+            cross.y = y;
+            
+            this.physics.add.existing(sprite);
+            this.collectibles.add(sprite);
+        }
+    }
+
+    collectItem(player, item) {
+        // Buscar un slot vacío en el inventario
+        if (this.inventory.length < 3) {
+            this.inventory.push(item);
+            const slot = this.inventorySlots[this.inventory.length - 1];
+            item.x = slot.x;
+            item.y = slot.y;
+            item.body.enable = false;
+            if (item.cross) {
+                item.cross.x = slot.x;
+                item.cross.y = slot.y;
+            }
+        }
+
+        // Si se recolectaron todos los objetos, generar más
+        if (this.collectibles.countActive() <= 1) {
+            this.generateCollectibles();
+        }
+    }
+
+    checkCrafting(player, craftingArea) {
+        if (this.inventory.length === 3) {
+            // Combinar objetos
+            this.inventory.forEach(item => {
+                if (item.cross) item.cross.destroy();
+                item.destroy();
+            });
+            this.inventory = [];
+
+            // Crear nuevo objeto combinado
+            const newColor = Phaser.Display.Color.RandomRGB();
+            const x = Phaser.Math.Between(50, this.gameWidth - 50);
+            const y = Phaser.Math.Between(50, this.gameHeight - 100);
+            
+            const newItem = this.add.rectangle(x, y, 20, 20, newColor.color);
+            this.physics.add.existing(newItem);
+            this.collectibles.add(newItem);
+
+            // Generar nuevos objetos
+            this.generateCollectibles();
+        }
+    }
+
+    update() {
+        // Detener al jugador cuando está cerca del objetivo
+        if (this.player.body.speed > 0) {
+            const distance = Phaser.Math.Distance.Between(
+                this.player.body.x, this.player.body.y,
+                this.player.body.x + this.player.body.velocity.x,
+                this.player.body.y + this.player.body.velocity.y
+            );
+            
+            if (distance < 4) {
+                this.player.body.reset(this.player.body.x, this.player.body.y);
+            }
+        }
+    }
+}
+
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            debug: false
+        }
+    },
+    scene: MainScene
+};
+
+new Phaser.Game(config);
+</script>
+</body>
+</html>
